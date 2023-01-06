@@ -247,6 +247,8 @@ class OneflowSDK {
 		$urlParts = parse_url($url);
 		$fullPath = $urlParts['path'];
 
+		$headers = $this->generate_headers($method, $path);
+
 		if (filter_var($url, FILTER_VALIDATE_URL)===FALSE)	return false;
 
 		$params = array(
@@ -266,6 +268,10 @@ class OneflowSDK {
 		$params['http']['header'][] = "x-oneflow-date: $timestamp";
 		$params['http']['header'][] = $this->authHeader.": ".$this->token($method, $fullPath, $timestamp);
 
+		foreach($headers as $header){
+            $params['http']['header'][] = $header;
+        }
+
 		foreach ($optional_headers as $name => $value)	{
 			$params['http']['header'][] = "$name: $value";
 		}
@@ -277,7 +283,7 @@ class OneflowSDK {
 			if (!$fp)	{
 				throw new Exception("Problem creating stream from $url, \n\t".implode("\n\t", error_get_last()));
 			}
-			
+
 			$response = stream_get_contents($fp);
 			if ($response === false)	throw new Exception("Problem reading data from $url, $php_errormsg");
 
@@ -376,6 +382,27 @@ class OneflowSDK {
 
 		return $response;
 	}
+
+	private function generate_headers($method, $path) {
+        $t = microtime(true);
+        $micro = sprintf("%03d",($t - floor($t)) * 1000);
+        $timestamp = gmdate('Y-m-d\TH:i:s.', $t).$micro.'Z';
+
+        // Create the HMAC header to authenticate the API calls.
+
+        $str = $method . ' ' . $path . ' ' .$timestamp;
+        $hash = hash_hmac('sha1', $str, $this->secret);
+        $hmacHeader = $this->key . ':' . $hash;
+
+        $headers = [
+            'x-hp-hmac-authentication: ' . $hmacHeader,
+            'x-hp-hmac-date: ' . $timestamp,
+            'x-hp-hmac-algorithm: SHA1'
+        ];
+        return $headers;
+        // return [];
+
+    }
 
 	/**
 	 * post_file function.
